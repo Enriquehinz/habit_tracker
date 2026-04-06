@@ -44,6 +44,7 @@ export function ContributionHeatmap({
   rangeDays = 365,
 }: HeatmapProps) {
   const weeks = getCalendarWeeks(rangeDays, new Date(`${todayDate}T12:00:00`));
+  const displayWeeks = [...weeks].reverse();
 
   return (
     <section className="rounded-3xl border bg-[var(--card)] p-4 shadow-sm backdrop-blur sm:p-5">
@@ -74,10 +75,10 @@ export function ContributionHeatmap({
       <div className="overflow-x-auto">
         <div className="inline-block min-w-full">
           <div className="mb-2 ml-8 flex gap-1">
-            {weeks.map((week, index) => {
+            {displayWeeks.map((week, index) => {
               const firstVisibleDay = week.find((day) => day.inRange);
               const previousVisibleDay =
-                index > 0 ? weeks[index - 1].find((day) => day.inRange) : undefined;
+                index > 0 ? displayWeeks[index - 1].find((day) => day.inRange) : undefined;
 
               const monthLabel =
                 firstVisibleDay &&
@@ -108,17 +109,16 @@ export function ContributionHeatmap({
             </div>
 
             <div className="flex gap-1">
-              {weeks.map((week) => (
+              {displayWeeks.map((week) => (
                 <div key={week[0].iso} className="grid grid-rows-7 gap-1">
                   {week.map((day) => {
                     const level = day.inRange ? levelsByDate[day.iso] ?? 0 : 0;
                     const isToday = day.iso === todayDate;
                     const canToggle = Boolean(onTodayClick && isToday);
+                    const dayLabel = formatDayLabel(day.iso) ?? day.iso;
                     const label =
                       labelsByDate?.[day.iso] ??
-                      `${formatDayLabel(day.iso)} · ${
-                        level > 0 ? "completed" : "not completed"
-                      }`;
+                      `${dayLabel} · ${level > 0 ? "completed" : "not completed"}`;
                     const classes = cn(
                       "h-4 w-4 rounded-[4px] border border-black/5 transition sm:h-[18px] sm:w-[18px]",
                       day.inRange ? levelClass(level) : "bg-transparent border-transparent",
@@ -141,7 +141,7 @@ export function ContributionHeatmap({
                         onClick={onTodayClick}
                         title={`${label} · Tap to toggle`}
                         className={classes}
-                        aria-label={`${title} for ${formatDayLabel(day.iso)}`}
+                        aria-label={`${title} for ${dayLabel}`}
                       />
                     );
                   })}

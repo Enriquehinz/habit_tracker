@@ -8,7 +8,7 @@ export type Habit = {
 export type HabitEntry = {
   completed: boolean;
   created_at: string;
-  date: string;
+  date: string | Date;
   habit_id: string;
   id: string;
   updated_at: string;

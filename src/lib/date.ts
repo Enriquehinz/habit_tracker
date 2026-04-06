@@ -3,6 +3,8 @@ import {
   eachDayOfInterval,
   endOfWeek,
   format,
+  isValid,
+  parseISO,
   startOfDay,
   startOfWeek,
   subDays,
@@ -17,6 +19,40 @@ export type CalendarCell = {
 
 export function toDateKey(date: Date) {
   return format(date, "yyyy-MM-dd");
+}
+
+export function normalizeDateKey(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return isValid(value) ? toDateKey(value) : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const parsedIso = parseISO(trimmed);
+
+  if (isValid(parsedIso)) {
+    return toDateKey(parsedIso);
+  }
+
+  const parsedDate = new Date(trimmed);
+
+  return isValid(parsedDate) ? toDateKey(parsedDate) : null;
 }
 
 export function getCalendarWeeks(rangeDays: number, today = new Date()) {
@@ -43,8 +79,14 @@ export function getCalendarWeeks(rangeDays: number, today = new Date()) {
   return weeks;
 }
 
-export function formatDayLabel(isoDate: string) {
-  return format(new Date(`${isoDate}T12:00:00`), "MMM d, yyyy");
+export function formatDayLabel(isoDate: Date | string | null | undefined) {
+  const normalizedDate = normalizeDateKey(isoDate);
+
+  if (!normalizedDate) {
+    return null;
+  }
+
+  return format(parseISO(normalizedDate), "MMM d, yyyy");
 }
 
 export function getMonthLabel(date: Date) {
@@ -52,5 +94,11 @@ export function getMonthLabel(date: Date) {
 }
 
 export function getPreviousDateKey(isoDate: string, days = 1) {
-  return toDateKey(addDays(new Date(`${isoDate}T12:00:00`), -days));
+  const normalizedDate = normalizeDateKey(isoDate);
+
+  if (!normalizedDate) {
+    return isoDate;
+  }
+
+  return toDateKey(addDays(parseISO(normalizedDate), -days));
 }

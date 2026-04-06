@@ -5,7 +5,12 @@ import { useMemo, useState } from "react";
 
 import { ContributionHeatmap } from "@/components/contribution-heatmap";
 import { YEAR_RANGE_DAYS } from "@/lib/constants";
-import { formatDayLabel, getPreviousDateKey, toDateKey } from "@/lib/date";
+import {
+  formatDayLabel,
+  getPreviousDateKey,
+  normalizeDateKey,
+  toDateKey,
+} from "@/lib/date";
 import type { Habit, HabitEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -47,9 +52,18 @@ export function DashboardClient({
   userEmail,
 }: DashboardClientProps) {
   const today = toDateKey(new Date());
+  const todayLabel = formatDayLabel(today) ?? "today";
   const [entries, setEntries] = useState<Record<string, HabitEntry>>(() =>
     Object.fromEntries(
-      initialEntries.map((entry) => [getEntryKey(entry.habit_id, entry.date), entry]),
+      initialEntries.flatMap((entry) => {
+        const dateKey = normalizeDateKey(entry.date);
+
+        if (!dateKey) {
+          return [];
+        }
+
+        return [[getEntryKey(entry.habit_id, dateKey), { ...entry, date: dateKey }] as const];
+      }),
     ),
   );
   const [savingHabitIds, setSavingHabitIds] = useState<string[]>([]);
@@ -59,11 +73,13 @@ export function DashboardClient({
     const counts: Record<string, number> = {};
 
     Object.values(entries).forEach((entry) => {
-      if (!entry.completed) {
+      const dateKey = normalizeDateKey(entry.date);
+
+      if (!entry.completed || !dateKey) {
         return;
       }
 
-      counts[entry.date] = (counts[entry.date] ?? 0) + 1;
+      counts[dateKey] = (counts[dateKey] ?? 0) + 1;
     });
 
     return counts;
@@ -83,8 +99,14 @@ export function DashboardClient({
     const labels: Record<string, string> = {};
 
     Object.keys(globalLevelsByDate).forEach((date) => {
+      const dayLabel = formatDayLabel(date);
+
+      if (!dayLabel) {
+        return;
+      }
+
       const completedCount = completedCountByDate[date] ?? 0;
-      labels[date] = `${formatDayLabel(date)} · ${completedCount}/${habits.length} habits completed`;
+      labels[date] = `${dayLabel} · ${completedCount}/${habits.length} habits completed`;
     });
 
     return labels;
@@ -195,7 +217,7 @@ export function DashboardClient({
           <div>
             <h2 className="text-lg font-semibold">Today</h2>
             <p className="text-sm text-[var(--muted)]">
-              Tap once to mark a habit complete for {formatDayLabel(today)}.
+              Tap once to mark a habit complete for {todayLabel}.
             </p>
           </div>
           <div className="hidden rounded-full border bg-[var(--card-strong)] px-3 py-1.5 text-sm text-[var(--muted)] sm:inline-flex">
@@ -267,12 +289,20 @@ export function DashboardClient({
               return;
             }
 
-            levelsByDate[entry.date] = 4;
-            labelsByDate[entry.date] = `${formatDayLabel(entry.date)} · completed`;
+            const dateKey = normalizeDateKey(entry.date);
+            const dayLabel = formatDayLabel(entry.date);
+
+            if (!dateKey || !dayLabel) {
+              return;
+            }
+
+            levelsByDate[dateKey] = 4;
+            labelsByDate[dateKey] = `${dayLabel} · completed`;
           });
 
           labelsByDate[today] =
-            labelsByDate[today] ?? `${formatDayLabel(today)} · not completed`;
+            labelsByDate[today] ??
+            (todayLabel ? `${todayLabel} · not completed` : "Today · not completed");
 
           return (
             <ContributionHeatmap

@@ -1,6 +1,14 @@
 import { DEFAULT_HABITS } from "@/lib/constants";
 import { getSql } from "@/lib/db";
+import { normalizeDateKey } from "@/lib/date";
 import type { Habit, HabitEntry } from "@/lib/types";
+
+function normalizeHabitEntry(entry: HabitEntry): HabitEntry {
+  return {
+    ...entry,
+    date: normalizeDateKey(entry.date) ?? "",
+  };
+}
 
 export async function ensureDefaultHabits(userId: string) {
   const sql = getSql();
@@ -28,13 +36,17 @@ export async function getHabitsForUser(userId: string) {
 export async function getHabitEntriesForUser(userId: string, startDate: string) {
   const sql = getSql();
 
-  return (await sql`
+  const entries = (await sql`
     select id, user_id, habit_id, date, completed, created_at, updated_at
     from habit_entries
     where user_id = ${userId}
       and date >= ${startDate}
     order by date asc
   `) as HabitEntry[];
+
+  return entries
+    .map(normalizeHabitEntry)
+    .filter((entry) => Boolean(entry.date));
 }
 
 export async function getHabitForUser(userId: string, habitId: string) {
@@ -72,5 +84,5 @@ export async function upsertHabitEntry({
     returning id, user_id, habit_id, date, completed, created_at, updated_at
   `) as HabitEntry[];
 
-  return rows[0] ?? null;
+  return rows[0] ? normalizeHabitEntry(rows[0]) : null;
 }
