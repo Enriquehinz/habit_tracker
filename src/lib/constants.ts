@@ -12,6 +12,8 @@ export const DEFAULT_HABITS = [
 export const ALLOWED_EMAILS = [
   "enriquehinzpeter@gmail.com",
   "isabel.robleda@gmail.com",
+  "fernandoarroyolopez@gmail.com",
+  "sametcanoztrk@gmail.com",
 ] as const;
 
 export const YEAR_RANGE_DAYS = 365;

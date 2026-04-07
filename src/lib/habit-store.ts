@@ -1,7 +1,13 @@
 import { DEFAULT_HABITS } from "@/lib/constants";
 import { getSql } from "@/lib/db";
 import { normalizeDateKey } from "@/lib/date";
-import { getAverageCompletionPercentage } from "@/lib/scoring";
+import {
+  getAverageCompletionPercentage,
+  getAverageCompletionPercentageForOffset,
+  getCompletedCountByDate,
+  getDailyCompletionSnapshot,
+  getTrendFromScores,
+} from "@/lib/scoring";
 import type { AuthUser, CompetitionSummary, Habit, HabitEntry, UserProfile } from "@/lib/types";
 
 function normalizeHabitEntry(entry: HabitEntry): HabitEntry {
@@ -248,7 +254,7 @@ export async function getCompetitionSummaries() {
   const entries = (await sql`
     select id, user_id, habit_id, date, completed, created_at, updated_at
     from habit_entries
-    where date >= current_date - interval '6 days'
+    where date >= current_date - interval '13 days'
   `) as HabitEntry[];
 
   return users.map<CompetitionSummary>((user) => {
@@ -257,11 +263,28 @@ export async function getCompetitionSummaries() {
       .filter((entry) => entry.user_id === user.id)
       .map(normalizeHabitEntry)
       .filter((entry) => Boolean(entry.date));
+    const completedCountByDate = getCompletedCountByDate(userEntries);
+    const weeklyScore = getAverageCompletionPercentage(userHabits, userEntries, 7);
+    const previousWeekScore = getAverageCompletionPercentageForOffset(
+      userHabits,
+      userEntries,
+      7,
+      7,
+    );
+    const todaySnapshot = getDailyCompletionSnapshot(
+      userHabits,
+      completedCountByDate,
+      normalizeDateKey(new Date()) ?? "",
+    );
 
     return {
       email: user.email,
-      score: getAverageCompletionPercentage(userHabits, userEntries, 7),
+      todayCompletedCount: todaySnapshot.completedCount,
+      todayHabitCount: todaySnapshot.totalHabits,
+      todayScore: todaySnapshot.percentage,
+      trend: getTrendFromScores(weeklyScore, previousWeekScore),
       userId: user.id,
+      weeklyScore,
     };
   });
 }

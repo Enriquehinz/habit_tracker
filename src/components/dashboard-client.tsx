@@ -14,9 +14,12 @@ import {
 import {
   getActiveHabitCountForDate,
   getAverageCompletionPercentage,
+  getAverageCompletionPercentageForOffset,
   getCompletedCountByDate,
   getCompletionPercentageForDate,
+  getDailyCompletionSnapshot,
   getHeatmapLevelFromPercentage,
+  getTrendFromScores,
   rankCompetitionSummaries,
 } from "@/lib/scoring";
 import type { CompetitionSummary, Habit, HabitEntry } from "@/lib/types";
@@ -134,20 +137,70 @@ export function DashboardClient({
     () => getAverageCompletionPercentage(habitList, entryList, 7),
     [entryList, habitList],
   );
+  const currentUserPreviousWeekScore = useMemo(
+    () => getAverageCompletionPercentageForOffset(habitList, entryList, 7, 7),
+    [entryList, habitList],
+  );
+  const currentUserTodaySnapshot = useMemo(
+    () => getDailyCompletionSnapshot(habitList, completedCountByDate, today),
+    [completedCountByDate, habitList, today],
+  );
 
   const competitionRows = useMemo(() => {
     const rows = initialCompetition.some((row) => row.userId === userId)
       ? initialCompetition.map((row) =>
-          row.userId === userId ? { ...row, email: userEmail, score: currentUserScore } : row,
+          row.userId === userId
+            ? {
+                ...row,
+                email: userEmail,
+                todayCompletedCount: currentUserTodaySnapshot.completedCount,
+                todayHabitCount: currentUserTodaySnapshot.totalHabits,
+                todayScore: currentUserTodaySnapshot.percentage,
+                trend: getTrendFromScores(currentUserScore, currentUserPreviousWeekScore),
+                weeklyScore: currentUserScore,
+              }
+            : row,
         )
-      : [...initialCompetition, { email: userEmail, score: currentUserScore, userId }];
+      : [
+          ...initialCompetition,
+          {
+            email: userEmail,
+            todayCompletedCount: currentUserTodaySnapshot.completedCount,
+            todayHabitCount: currentUserTodaySnapshot.totalHabits,
+            todayScore: currentUserTodaySnapshot.percentage,
+            trend: getTrendFromScores(currentUserScore, currentUserPreviousWeekScore),
+            userId,
+            weeklyScore: currentUserScore,
+          },
+        ];
 
     return rankCompetitionSummaries(rows);
-  }, [currentUserScore, initialCompetition, userEmail, userId]);
+  }, [
+    currentUserPreviousWeekScore,
+    currentUserScore,
+    currentUserTodaySnapshot.completedCount,
+    currentUserTodaySnapshot.percentage,
+    currentUserTodaySnapshot.totalHabits,
+    initialCompetition,
+    userEmail,
+    userId,
+  ]);
 
   const leaderRows = competitionRows.filter(
-    (row) => Math.abs(row.score - (competitionRows[0]?.score ?? 0)) < 0.0001,
+    (row) => Math.abs(row.weeklyScore - (competitionRows[0]?.weeklyScore ?? 0)) < 0.0001,
   );
+
+  function getTrendLabel(trend: CompetitionSummary["trend"]) {
+    if (trend === "improving") {
+      return "Improving";
+    }
+
+    if (trend === "declining") {
+      return "Declining";
+    }
+
+    return "Stable";
+  }
 
   function getHabitCompleted(habitId: string, date = today) {
     return entries[getEntryKey(habitId, date)]?.completed ?? false;
@@ -365,13 +418,14 @@ export function DashboardClient({
             </h2>
             <p className="text-sm text-[var(--muted)]">
               {leaderRows.map((row) => row.email).join(" and ")} at{" "}
-              {formatPercent(leaderRows[0]?.score ?? 0)} average completion over the last 7
+              {formatPercent(leaderRows[0]?.weeklyScore ?? 0)} average completion over the last 7
               days.
             </p>
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="mb-4 space-y-3">
+          <h3 className="text-sm font-semibold text-[var(--muted)]">Weekly leaderboard</h3>
           {competitionRows.map((row) => {
             const isLeader = row.rank === 1;
             const isCurrentUser = row.userId === userId;
@@ -389,9 +443,11 @@ export function DashboardClient({
                     <p className="text-sm font-medium">
                       #{row.rank} {isCurrentUser ? `${row.email} (You)` : row.email}
                     </p>
-                    <p className="text-xs text-[var(--muted)]">Last 7 days</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      Last 7 days · {getTrendLabel(row.trend)}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold">{formatPercent(row.score)}</p>
+                  <p className="text-sm font-semibold">{formatPercent(row.weeklyScore)}</p>
                 </div>
                 <div className="h-2 rounded-full bg-black/5 dark:bg-white/8">
                   <div
@@ -399,7 +455,39 @@ export function DashboardClient({
                       "h-2 rounded-full",
                       isLeader ? "bg-amber-500" : "bg-emerald-500",
                     )}
-                    style={{ width: `${row.score * 100}%` }}
+                    style={{ width: `${row.weeklyScore * 100}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-[var(--muted)]">Today</h3>
+          {competitionRows.map((row) => {
+            const isCurrentUser = row.userId === userId;
+
+            return (
+              <div
+                key={`${row.userId}-today`}
+                className="rounded-2xl border bg-[var(--card-strong)] px-4 py-3"
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {isCurrentUser ? `${row.email} (You)` : row.email}
+                    </p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {row.todayCompletedCount}/{row.todayHabitCount} habits today
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold">{formatPercent(row.todayScore)}</p>
+                </div>
+                <div className="h-2 rounded-full bg-black/5 dark:bg-white/8">
+                  <div
+                    className="h-2 rounded-full bg-sky-500"
+                    style={{ width: `${row.todayScore * 100}%` }}
                   />
                 </div>
               </div>

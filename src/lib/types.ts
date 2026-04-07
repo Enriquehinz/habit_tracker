@@ -30,6 +30,10 @@ export type UserProfile = {
 
 export type CompetitionSummary = {
   email: string;
-  score: number;
+  todayCompletedCount: number;
+  todayHabitCount: number;
+  todayScore: number;
+  trend: "declining" | "improving" | "stable";
   userId: string;
+  weeklyScore: number;
 };
