@@ -1,7 +1,6 @@
 export const DEFAULT_HABITS = [
   "Exercise",
   "Eating healthy",
-  "Face routine",
   "Meditate (10 mins)",
   "Read (30 mins)",
   "Vibe code (30 mins)",

@@ -20,3 +20,16 @@ export type AuthUser = {
   id: string;
   name: string | null;
 };
+
+export type UserProfile = {
+  created_at: string;
+  default_habits_seeded: boolean;
+  email: string;
+  id: string;
+};
+
+export type CompetitionSummary = {
+  email: string;
+  score: number;
+  userId: string;
+};
